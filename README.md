@@ -2,6 +2,12 @@
 
 NeonTrip is a production-grade, AI-powered travel itinerary generator tailored specifically for India. It uses the Model Context Protocol (MCP) to supply an AI agent with live real-world data (weather, hotels, flights, and currency) to craft realistic, budget-aware, day-by-day travel plans.
 
+<div align="center">
+  <img src="docs/screenshot1.png" alt="NeonTrip Hero" width="800"/>
+  <br><br>
+  <img src="docs/screenshot2.png" alt="NeonTrip Form" width="800"/>
+</div>
+
 ## ✨ Features
 
 - **Live Real-World Data**: Uses MCP to connect to live tools, so the AI never hallucinates prices or weather.
