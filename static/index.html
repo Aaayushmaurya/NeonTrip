@@ -1,0 +1,900 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>NeonTrip — AI Travel Planner India</title>
+<meta name="description" content="AI-crafted travel itineraries with real weather, real prices and verified hotels across India."/>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700;800;900&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+<style>
+/* ─── RESET ─────────────────────────────────────── */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --g:#00FF88;--c:#00D4FF;--m:#FF2D78;--o:#FF8C42;--y:#FFE566;
+  --bg:#050911;--surface:rgba(255,255,255,.04);--border:rgba(255,255,255,.08);
+  --txt:#F0F4FF;--sub:rgba(240,244,255,.55);--dim:rgba(240,244,255,.28);
+}
+html{scroll-behavior:smooth}
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--txt);min-height:100vh;overflow-x:hidden}
+
+/* ─── BACKGROUND ─────────────────────────────────── */
+#bg{position:fixed;inset:0;z-index:0;background-size:cover;background-position:center;
+  opacity:0;transition:opacity 1.6s ease;filter:saturate(1.2) brightness(.7)}
+#vignette{position:fixed;inset:0;z-index:1;pointer-events:none;
+  background:radial-gradient(ellipse 120% 80% at 50% 100%,rgba(5,9,17,.95) 0%,rgba(5,9,17,.4) 100%)}
+#rain{position:fixed;inset:0;z-index:2;pointer-events:none;opacity:0;transition:opacity 1.2s}
+#pts{position:fixed;inset:0;z-index:3;pointer-events:none}
+main{position:relative;z-index:10}
+
+/* ─── NAVBAR ─────────────────────────────────────── */
+nav{
+  position:fixed;top:0;left:0;right:0;z-index:200;
+  display:flex;align-items:center;justify-content:space-between;
+  padding:.8rem 2.5rem;
+  background:rgba(5,9,17,.7);backdrop-filter:blur(24px) saturate(1.5);
+  border-bottom:1px solid rgba(255,255,255,.06);
+}
+.logo{font-family:'Outfit',sans-serif;font-size:1.4rem;font-weight:900;letter-spacing:-.03em;
+  background:linear-gradient(135deg,var(--g),var(--c));-webkit-background-clip:text;
+  -webkit-text-fill-color:transparent;background-clip:text}
+.logo em{-webkit-text-fill-color:var(--m);font-style:normal}
+.nav-clock{text-align:center}
+.clock-time{font-family:'Outfit',sans-serif;font-size:.95rem;font-weight:700;color:var(--g);letter-spacing:.05em}
+.clock-date{display:block;font-size:.66rem;color:var(--dim);margin-top:.1rem;letter-spacing:.06em;text-transform:uppercase}
+.nav-right{display:flex;align-items:center;gap:.75rem}
+.live-pill{display:flex;align-items:center;gap:.4rem;font-size:.72rem;color:var(--sub);
+  background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);
+  padding:.3rem .75rem;border-radius:100px}
+.live-dot{width:6px;height:6px;border-radius:50%;background:var(--g);
+  box-shadow:0 0 8px var(--g);animation:pulse 2s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(.7)}}
+
+/* ─── PAGE SECTIONS ──────────────────────────────── */
+#page-home{display:flex;flex-direction:column;align-items:center;min-height:100vh;padding:6rem 1.5rem 4rem}
+#page-results{display:none;padding:5rem 2rem 6rem;max-width:1140px;margin:0 auto}
+
+/* ─── HERO ───────────────────────────────────────── */
+.hero-top{text-align:center;max-width:700px;margin-bottom:3.5rem}
+.badge{display:inline-flex;align-items:center;gap:.4rem;
+  font-size:.7rem;font-weight:600;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--c);border:1px solid rgba(0,212,255,.25);background:rgba(0,212,255,.06);
+  padding:.3rem .9rem;border-radius:100px;margin-bottom:1.8rem}
+h1{font-family:'Outfit',sans-serif;font-size:clamp(2.8rem,6.5vw,5.2rem);
+  font-weight:900;line-height:1.04;letter-spacing:-.03em;margin-bottom:1.1rem}
+h1 .g{background:linear-gradient(120deg,var(--g),var(--c),var(--m));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+  filter:drop-shadow(0 0 30px rgba(0,255,136,.3))}
+.quote{font-size:clamp(.9rem,1.6vw,1.05rem);color:var(--c);font-style:italic;
+  font-weight:300;margin-bottom:.6rem;letter-spacing:.01em}
+.sub{font-size:clamp(.85rem,1.4vw,.98rem);color:var(--sub);line-height:1.75;max-width:560px;margin:0 auto}
+
+/* ─── DEST PILLS ─────────────────────────────────── */
+.pills{display:flex;flex-wrap:wrap;gap:.5rem;justify-content:center;margin-bottom:3rem}
+.p{cursor:pointer;font-size:.78rem;font-weight:500;padding:.35rem .95rem;border-radius:100px;
+  border:1px solid var(--border);background:var(--surface);color:var(--sub);
+  transition:all .25s ease;user-select:none;white-space:nowrap}
+.p:hover,.p.on{border-color:var(--c);color:var(--c);background:rgba(0,212,255,.08);
+  box-shadow:0 0 16px rgba(0,212,255,.12);transform:translateY(-1px)}
+
+/* ─── PLANNER GRID ───────────────────────────────── */
+.planner{display:grid;grid-template-columns:1fr 380px;gap:1.5rem;width:100%;max-width:1060px}
+@media(max-width:880px){.planner{grid-template-columns:1fr}}
+
+/* ─── GLASS CARD ─────────────────────────────────── */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:20px;
+  padding:1.75rem;backdrop-filter:blur(24px);position:relative;overflow:hidden}
+.card::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,.12),transparent)}
+
+/* ─── FORM ELEMENTS ──────────────────────────────── */
+.lbl{display:block;font-size:.68rem;font-weight:600;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--c);margin-bottom:.45rem}
+.inp{width:100%;background:rgba(0,0,0,.35);border:1px solid rgba(255,255,255,.08);
+  border-radius:11px;padding:.75rem 1rem;color:var(--txt);font-family:'Inter',sans-serif;
+  font-size:.88rem;outline:none;transition:border-color .25s,box-shadow .25s}
+.inp:focus{border-color:rgba(0,255,136,.45);box-shadow:0 0 0 3px rgba(0,255,136,.08)}
+.inp::placeholder{color:var(--dim)}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:.9rem;margin-bottom:1.1rem}
+@media(max-width:500px){.row2{grid-template-columns:1fr}}
+
+/* Prompt suggestions */
+.sug-wrap{position:relative;margin-bottom:1.1rem}
+.sug-btn{width:100%;padding:.72rem 1rem;text-align:left;
+  background:rgba(0,212,255,.05);border:1px solid rgba(0,212,255,.18);
+  border-radius:11px;color:var(--sub);font-size:.82rem;font-family:'Inter',sans-serif;
+  cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:.5rem;
+  transition:all .25s}
+.sug-btn:hover{background:rgba(0,212,255,.1);border-color:rgba(0,212,255,.3)}
+.sug-btn .chevron{font-size:.7rem;transition:transform .25s;flex-shrink:0}
+.sug-btn.open .chevron{transform:rotate(180deg)}
+.sug-drop{display:none;position:absolute;top:calc(100% + 6px);left:0;right:0;z-index:100;
+  background:rgba(7,12,24,.97);border:1px solid rgba(0,212,255,.2);
+  border-radius:14px;overflow:hidden;backdrop-filter:blur(30px);
+  box-shadow:0 24px 60px rgba(0,0,0,.7)}
+.sug-drop.open{display:block}
+.sug-item{padding:.85rem 1.1rem;font-size:.8rem;color:var(--sub);cursor:pointer;
+  border-bottom:1px solid rgba(255,255,255,.04);transition:background .2s,color .2s;line-height:1.55}
+.sug-item:last-child{border-bottom:none}
+.sug-item:hover{background:rgba(0,255,136,.06);color:var(--txt)}
+.sug-tag{font-size:.64rem;font-weight:700;letter-spacing:.08em;color:var(--g);
+  background:rgba(0,255,136,.1);border-radius:4px;padding:.1rem .4rem;margin-right:.5rem}
+
+/* Travel mode */
+.mode-section{margin-bottom:1.1rem}
+.mode-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:.5rem;margin-bottom:.7rem}
+@media(max-width:500px){.mode-grid{grid-template-columns:repeat(3,1fr)}}
+.mode-card{display:flex;flex-direction:column;align-items:center;gap:.25rem;
+  padding:.6rem .3rem;border-radius:12px;border:1px solid var(--border);
+  background:var(--surface);cursor:pointer;transition:all .25s;user-select:none}
+.mode-card:hover{border-color:var(--o);background:rgba(255,140,66,.06)}
+.mode-card.on{border-color:var(--o);background:rgba(255,140,66,.1);
+  box-shadow:0 0 18px rgba(255,140,66,.15)}
+.mode-card .ico{font-size:1.4rem}
+.mode-card .lbl2{font-size:.62rem;color:var(--sub);font-weight:500;letter-spacing:.03em}
+.mode-card.on .lbl2{color:var(--o)}
+.sub-row{display:flex;flex-wrap:wrap;gap:.4rem;min-height:1.8rem}
+.sub-chip{padding:.28rem .72rem;border-radius:8px;font-size:.72rem;font-weight:500;
+  border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.03);
+  color:var(--sub);cursor:pointer;transition:all .2s}
+.sub-chip:hover{border-color:var(--y);color:var(--y);background:rgba(255,229,102,.06)}
+.sub-chip.on{border-color:var(--y);color:var(--y);background:rgba(255,229,102,.08)}
+.cost-line{margin-top:.55rem;font-size:.72rem;color:var(--dim);
+  display:flex;align-items:center;gap:.35rem}
+.cost-line b{color:var(--o);font-weight:600}
+
+/* Textarea */
+textarea.inp{resize:none;min-height:108px;line-height:1.65;margin-bottom:1.1rem}
+
+/* Generate button */
+.btn-gen{width:100%;padding:1.05rem 1.5rem;
+  font-family:'Outfit',sans-serif;font-size:1rem;font-weight:700;letter-spacing:.05em;
+  text-transform:uppercase;border:none;border-radius:13px;cursor:pointer;
+  background:linear-gradient(135deg,#00FF88 0%,#00c96a 100%);color:#050911;
+  position:relative;overflow:hidden;transition:transform .2s ease,box-shadow .3s ease;
+  box-shadow:0 0 32px rgba(0,255,136,.25),0 4px 20px rgba(0,0,0,.3)}
+.btn-gen::after{content:'';position:absolute;inset:0;
+  background:linear-gradient(rgba(255,255,255,.2),transparent);pointer-events:none}
+.btn-gen:hover:not(:disabled){transform:translateY(-2px);box-shadow:0 0 52px rgba(0,255,136,.45),0 8px 30px rgba(0,0,0,.4)}
+.btn-gen:active:not(:disabled){transform:translateY(0)}
+.btn-gen:disabled{opacity:.5;cursor:not-allowed}
+.form-foot{text-align:center;font-size:.72rem;color:var(--dim);margin-top:.8rem}
+.form-foot kbd{background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);
+  border-radius:4px;padding:.1rem .35rem;font-size:.65rem}
+
+/* ─── RIGHT COLUMN ───────────────────────────────── */
+.right-col{display:flex;flex-direction:column;gap:1.25rem}
+
+/* Calendar */
+.cal-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:.9rem}
+.cal-month{font-family:'Outfit',sans-serif;font-size:.95rem;font-weight:700;color:var(--c)}
+.cal-navs{display:flex;gap:.3rem}
+.cal-navs button{background:rgba(0,212,255,.08);border:1px solid rgba(0,212,255,.18);
+  border-radius:7px;color:var(--c);padding:.22rem .55rem;font-size:.8rem;cursor:pointer;transition:background .2s}
+.cal-navs button:hover{background:rgba(0,212,255,.2)}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px}
+.cal-dn{text-align:center;font-size:.57rem;font-weight:600;letter-spacing:.05em;
+  color:var(--dim);padding:.18rem 0}
+.cal-dn:first-child,.cal-dn:last-child{color:rgba(255,110,110,.7)}
+.cal-d{text-align:center;font-size:.71rem;font-weight:500;padding:.27rem .05rem;
+  border-radius:6px;cursor:pointer;transition:background .18s,color .18s;position:relative}
+.cal-d:hover{background:rgba(0,212,255,.1)}
+.cal-d.today{background:var(--g);color:#050911 !important;font-weight:800;box-shadow:0 0 12px rgba(0,255,136,.5)}
+.cal-d.wkd{color:rgba(255,110,110,.8)}
+.cal-d.hol{color:var(--y) !important;font-weight:700}
+.cal-d.hol::after{content:'';position:absolute;bottom:2px;left:50%;
+  transform:translateX(-50%);width:3px;height:3px;border-radius:50%;background:var(--y)}
+.cal-d.other{opacity:.22}
+.hol-name{margin-top:.55rem;padding:.38rem .65rem;border-radius:8px;
+  font-size:.68rem;color:var(--y);background:rgba(255,229,102,.07);
+  border:1px solid rgba(255,229,102,.18);display:none;line-height:1.4}
+.cal-leg{display:flex;gap:.8rem;margin-top:.7rem}
+.leg{display:flex;align-items:center;gap:.3rem;font-size:.62rem;color:var(--dim)}
+.leg-dot{width:6px;height:6px;border-radius:50%}
+
+/* Know Before You Go */
+.kbyg-title{font-family:'Outfit',sans-serif;font-size:.88rem;font-weight:700;
+  color:var(--g);margin-bottom:.8rem}
+.kbyg-item{display:flex;gap:.6rem;padding:.6rem 0;
+  border-bottom:1px solid rgba(255,255,255,.04)}
+.kbyg-item:last-child{border-bottom:none;padding-bottom:0}
+.kbyg-ico{font-size:.95rem;flex-shrink:0;margin-top:.05rem}
+.kbyg-body strong{display:block;font-size:.75rem;font-weight:600;color:var(--txt);margin-bottom:.15rem}
+.kbyg-body p{font-size:.72rem;color:var(--sub);line-height:1.55}
+
+/* Feature strip */
+.feat-strip{display:flex;flex-wrap:wrap;gap:.55rem 1.25rem;justify-content:center;margin-top:2.5rem;width:100%;max-width:1060px}
+.feat{font-size:.75rem;color:var(--dim);display:flex;align-items:center;gap:.35rem}
+
+/* ─── LOADER ─────────────────────────────────────── */
+#loader{display:none;position:fixed;inset:0;z-index:500;
+  background:rgba(5,9,17,.95);flex-direction:column;align-items:center;justify-content:center;gap:2rem}
+#loader.on{display:flex}
+.ring{width:72px;height:72px;position:relative}
+.ring::before,.ring::after{content:'';position:absolute;inset:0;border-radius:50%;border:2.5px solid transparent}
+.ring::before{border-top-color:var(--g);animation:spin 1s linear infinite}
+.ring::after{border-bottom-color:var(--c);animation:spin 1.5s linear infinite reverse;inset:9px}
+@keyframes spin{to{transform:rotate(360deg)}}
+.plane{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+  font-size:1.4rem;animation:bob 2s ease-in-out infinite}
+@keyframes bob{0%,100%{transform:translate(-50%,-50%)}50%{transform:translate(-50%,-60%)}}
+.steps{display:flex;flex-direction:column;gap:.5rem;align-items:flex-start}
+.step{display:flex;align-items:center;gap:.55rem;font-size:.8rem;color:var(--dim);transition:color .4s,transform .3s}
+.step.on{color:var(--g);transform:translateX(4px)}
+.step.done{color:rgba(0,255,136,.38)}
+.step-dot{width:5px;height:5px;border-radius:50%;background:currentColor;flex-shrink:0}
+.step.on .step-dot{box-shadow:0 0 8px currentColor}
+
+/* ─── RESULTS ────────────────────────────────────── */
+.res-hero{text-align:center;padding-bottom:2.5rem}
+.res-dest{font-family:'Outfit',sans-serif;font-size:clamp(2rem,5vw,3.5rem);font-weight:900;
+  background:linear-gradient(135deg,var(--g),var(--c));-webkit-background-clip:text;
+  -webkit-text-fill-color:transparent;background-clip:text;letter-spacing:-.02em;margin-bottom:.35rem}
+.res-sub{font-size:.9rem;color:var(--sub)}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:.85rem;margin-bottom:1.75rem}
+.sc{background:var(--surface);border:1px solid var(--border);border-radius:15px;
+  padding:1.1rem;text-align:center;transition:transform .3s,border-color .3s}
+.sc:hover{transform:translateY(-3px);border-color:rgba(0,255,136,.25)}
+.sv{font-family:'Outfit',sans-serif;font-size:1.6rem;font-weight:800;
+  color:var(--g);margin-bottom:.12rem;text-shadow:0 0 20px rgba(0,255,136,.3)}
+.sl{font-size:.65rem;color:var(--dim);text-transform:uppercase;letter-spacing:.08em}
+.sec-title{font-family:'Outfit',sans-serif;font-size:1.25rem;font-weight:800;
+  margin-bottom:1.1rem;display:flex;align-items:center;gap:.65rem}
+.sec-title::after{content:'';flex:1;height:1px;background:linear-gradient(90deg,rgba(0,255,136,.25),transparent)}
+.igrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:1rem;margin-bottom:1.75rem}
+.ic{background:var(--surface);border:1px solid var(--border);border-radius:18px;
+  padding:1.5rem;position:relative;overflow:hidden;transition:transform .3s,box-shadow .3s}
+.ic:hover{transform:translateY(-4px);box-shadow:0 20px 50px rgba(0,0,0,.4)}
+.ic::before{content:'';position:absolute;top:0;left:0;right:0;height:2px}
+.wc::before{background:linear-gradient(90deg,var(--c),transparent)}
+.fc::before{background:linear-gradient(90deg,var(--m),transparent)}
+.hc::before{background:linear-gradient(90deg,var(--o),transparent)}
+.cc::before{background:linear-gradient(90deg,var(--y),transparent)}
+.cico{font-size:1.75rem;margin-bottom:.55rem}
+.ctitle{font-family:'Outfit',sans-serif;font-size:.95rem;font-weight:700;margin-bottom:.85rem}
+.kvs{display:flex;flex-direction:column;gap:.38rem}
+.kv{display:flex;justify-content:space-between;align-items:baseline;
+  font-size:.8rem;padding-bottom:.38rem;border-bottom:1px solid rgba(255,255,255,.04)}
+.kv:last-child{border-bottom:none;padding-bottom:0}
+.kk{color:var(--sub)}.kv2{color:var(--txt);font-weight:500;text-align:right;max-width:60%}
+.kv2.g{color:var(--g)}.kv2.c{color:var(--c)}.kv2.m{color:var(--m)}.kv2.o{color:var(--o)}.kv2.y{color:var(--y)}
+.adv{margin-top:.8rem;padding:.55rem .85rem;border-radius:8px;font-size:.78rem;line-height:1.5;
+  background:rgba(0,212,255,.07);border-left:3px solid var(--c);color:var(--sub)}
+.bb{display:inline-block;margin-top:.35rem;padding:.2rem .85rem;border-radius:100px;font-size:.72rem;font-weight:600}
+.bb.ok{background:rgba(0,255,136,.1);color:var(--g);border:1px solid rgba(0,255,136,.25)}
+.bb.ov{background:rgba(255,140,66,.1);color:var(--o);border:1px solid rgba(255,140,66,.25)}
+.hotels{display:flex;flex-direction:column;gap:.65rem;margin-bottom:1.75rem}
+.hotel{display:flex;justify-content:space-between;align-items:center;
+  padding:.8rem 1rem;background:rgba(0,0,0,.25);border-radius:11px;
+  border:1px solid rgba(255,255,255,.05);gap:.8rem;flex-wrap:wrap}
+.hn{font-weight:600;font-size:.86rem}
+.hm{font-size:.7rem;color:var(--sub);margin-top:.1rem}
+.hp{font-weight:700;color:var(--o);font-size:.82rem;white-space:nowrap}
+.tl{display:flex;flex-direction:column;gap:.8rem;margin-bottom:1.75rem}
+.dc{background:var(--surface);border:1px solid var(--border);border-radius:15px;overflow:hidden}
+.dh{display:flex;align-items:center;gap:.85rem;padding:.95rem 1.3rem;cursor:pointer;
+  border-bottom:1px solid rgba(255,255,255,.04);transition:background .2s}
+.dh:hover{background:rgba(255,255,255,.03)}
+.dn{font-family:'Outfit',sans-serif;font-weight:800;font-size:.72rem;width:32px;height:32px;
+  border-radius:8px;display:flex;align-items:center;justify-content:center;
+  background:linear-gradient(135deg,var(--g),var(--c));color:#050911;flex-shrink:0}
+.dt{font-weight:600;font-size:.88rem;flex:1}
+.dco{font-size:.75rem;color:var(--g);font-weight:600;white-space:nowrap}
+.dchev{font-size:.6rem;color:var(--dim);transition:transform .3s}
+.dc.open .dchev{transform:rotate(180deg)}
+.db{display:none;padding:1rem 1.3rem}
+.dc.open .db{display:block}
+.al{list-style:none;margin-bottom:.8rem}
+.al li{display:flex;align-items:flex-start;gap:.45rem;font-size:.8rem;color:var(--sub);
+  padding:.22rem 0;line-height:1.5}
+.al li::before{content:'›';color:var(--g);font-size:.95rem;flex-shrink:0}
+.mls{display:flex;gap:.4rem;flex-wrap:wrap}
+.mc{font-size:.72rem;padding:.22rem .65rem;border-radius:100px;
+  background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);color:var(--sub)}
+.mc b{color:var(--txt);margin-right:.2rem}
+.tips{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:.65rem;margin-bottom:1.75rem}
+.tip{display:flex;align-items:flex-start;gap:.6rem;padding:.8rem .95rem;
+  background:var(--surface);border-radius:10px;border:1px solid var(--border);
+  font-size:.78rem;color:var(--sub);line-height:1.5}
+.sum{background:linear-gradient(135deg,rgba(0,255,136,.04),rgba(0,212,255,.04));
+  border:1px solid rgba(0,255,136,.15);border-radius:16px;padding:1.5rem;margin-bottom:1.75rem;
+  font-size:.88rem;line-height:1.8;color:var(--sub)}
+.dl-area{text-align:center;padding:2rem 0 1rem}
+.btn-dl{display:inline-flex;align-items:center;gap:.65rem;padding:.9rem 2.1rem;
+  font-family:'Outfit',sans-serif;font-size:.9rem;font-weight:700;text-decoration:none;
+  text-transform:uppercase;letter-spacing:.06em;color:var(--g);border:2px solid var(--g);
+  border-radius:12px;transition:all .3s;box-shadow:0 0 20px rgba(0,255,136,.12)}
+.btn-dl:hover{background:var(--g);color:#050911;box-shadow:0 0 48px rgba(0,255,136,.4);transform:translateY(-2px)}
+.btn-back{display:inline-flex;align-items:center;gap:.4rem;margin-top:.85rem;
+  padding:.65rem 1.6rem;font-size:.8rem;font-weight:600;color:var(--sub);background:none;
+  border:1px solid rgba(255,255,255,.1);border-radius:10px;cursor:pointer;
+  font-family:'Inter',sans-serif;transition:all .3s;text-transform:uppercase;letter-spacing:.06em}
+.btn-back:hover{color:var(--txt);border-color:rgba(255,255,255,.25)}
+
+/* ─── TOAST ──────────────────────────────────────── */
+#toast{position:fixed;bottom:2rem;left:50%;transform:translateX(-50%);z-index:600;
+  padding:.85rem 1.5rem;background:rgba(255,45,45,.12);border:1px solid rgba(255,45,45,.3);
+  border-radius:10px;color:#FF7575;font-size:.85rem;backdrop-filter:blur(20px);
+  opacity:0;pointer-events:none;transition:opacity .4s;max-width:90vw;white-space:nowrap}
+#toast.on{opacity:1}
+#up{position:fixed;bottom:2rem;right:2rem;z-index:50;width:40px;height:40px;border-radius:10px;
+  background:rgba(0,255,136,.1);border:1px solid rgba(0,255,136,.25);color:var(--g);
+  font-size:.95rem;display:none;align-items:center;justify-content:center;cursor:pointer;transition:all .3s}
+#up:hover{background:var(--g);color:#050911}
+#up.on{display:flex}
+::-webkit-scrollbar{width:4px}::-webkit-scrollbar-track{background:var(--bg)}
+::-webkit-scrollbar-thumb{background:rgba(0,255,136,.22);border-radius:2px}
+</style>
+</head>
+<body>
+
+<div id="bg"></div>
+<div id="vignette"></div>
+<canvas id="rain"></canvas>
+<canvas id="pts"></canvas>
+
+<!-- NAV -->
+<nav>
+  <div class="logo">Neon<em>Trip</em></div>
+  <div class="nav-clock">
+    <div class="clock-time" id="ct">--:--:--</div>
+    <span class="clock-date" id="cd">...</span>
+  </div>
+  <div class="nav-right">
+    <div class="live-pill"><div class="live-dot"></div>Live Data</div>
+  </div>
+</nav>
+
+<main>
+<!-- ══════════════════ HOME ══════════════════ -->
+<div id="page-home">
+
+  <!-- Hero -->
+  <div class="hero-top">
+    <div class="badge">✦ India's AI Travel Planner</div>
+    <h1>Plan Your Dream<br><span class="g">India Journey</span></h1>
+    <p class="quote">"We travel not to escape life, but for life not to escape us."</p>
+    <p class="sub" style="margin-top:.55rem">Stop dreaming and start packing. Experience India your way with instant AI-crafted itineraries — real weather, real prices, verified hotels.</p>
+  </div>
+
+  <!-- Destination pills -->
+  <div class="pills">
+    <div class="p" data-d="Manali"    data-q="Plan a 5-day trip from Delhi to Manali for 2 people, budget Rs.35000. We love adventure and nature.">🏔️ Manali</div>
+    <div class="p" data-d="Goa"       data-q="Plan a 4-day beach trip to Goa from Mumbai for a couple, budget Rs.28000. Party vibes and seafood.">🏖️ Goa</div>
+    <div class="p" data-d="Ooty"      data-q="Plan a 3-day trip to Ooty from Bangalore for 2 people, budget Rs.18000. Tea gardens and peaceful nature.">🌿 Ooty</div>
+    <div class="p" data-d="Meghalaya" data-q="Plan a 5-day trip to Meghalaya from Kolkata for 2, budget Rs.38000. Waterfalls and living root bridges.">🌊 Meghalaya</div>
+    <div class="p" data-d="Rajasthan" data-q="Plan a 7-day royal Rajasthan tour from Delhi for 4, budget Rs.90000. Forts, palaces and desert camps.">🏜️ Rajasthan</div>
+    <div class="p" data-d="Kerala"    data-q="Plan a 5-day Kerala backwaters trip from Mumbai for a couple, budget Rs.45000. Houseboats and Ayurveda.">🌴 Kerala</div>
+    <div class="p" data-d="Ladakh"    data-q="Plan a 7-day Leh Ladakh bike trip from Delhi for 2, budget Rs.65000. High passes and monasteries.">🏞️ Ladakh</div>
+    <div class="p" data-d="Varanasi"  data-q="Plan a 3-day spiritual trip to Varanasi from Delhi for 2, budget Rs.15000. Ghats and culture.">🪔 Varanasi</div>
+  </div>
+
+  <!-- Planner grid -->
+  <div class="planner">
+
+    <!-- LEFT: Form -->
+    <div class="card" style="overflow:visible">
+      <!-- From → To -->
+      <div class="row2" style="margin-bottom:.9rem">
+        <div><label class="lbl" for="origin">📍 Travelling From</label><input class="inp" id="origin" type="text" placeholder="e.g. Patna, Delhi, Mumbai" autocomplete="off"/></div>
+        <div><label class="lbl" for="dest-inp">🏁 Travelling To</label><input class="inp" id="dest-inp" type="text" placeholder="e.g. Manali, Goa, Ooty"/></div>
+      </div>
+      <!-- Name + Budget -->
+      <div class="row2">
+        <div><label class="lbl" for="uid">Your Name</label><input class="inp" id="uid" type="text" placeholder="e.g. Rahul Sharma" autocomplete="off"/></div>
+        <div><label class="lbl" for="bud">Total Budget</label><input class="inp" id="bud" type="text" placeholder="e.g. Rs. 50,000"/></div>
+      </div>
+
+      <!-- Prompt templates -->
+      <div class="sug-wrap" id="sug-wrap">
+        <label class="lbl">💡 Prompt Templates</label>
+        <button class="sug-btn" id="sug-btn" type="button" onclick="toggleSug()">
+          <span id="sug-lbl">Pick a template to get started quickly…</span>
+          <span class="chevron">▾</span>
+        </button>
+        <div class="sug-drop" id="sug-drop">
+          <div class="sug-item" onclick="useTpl('Plan a 5-day romantic trip to Goa from Delhi for 2 people, budget Rs.40000. We love beaches, sunsets, seafood and nightlife.')"><span class="sug-tag">ROMANTIC</span>5-day Goa couple · Delhi · Rs.40,000</div>
+          <div class="sug-item" onclick="useTpl('Plan a 7-day family trip to Kerala from Mumbai for 4 including 2 kids, budget Rs.80000. Houseboat, wildlife, hill stations.')"><span class="sug-tag">FAMILY</span>7-day Kerala family with kids · Mumbai · Rs.80,000</div>
+          <div class="sug-item" onclick="useTpl('Plan a budget solo trip from Bangalore to Hampi and Gokarna for 5 days, budget Rs.12000. Backpacker style, hostels are fine.')"><span class="sug-tag">SOLO</span>5-day Hampi + Gokarna solo · Bangalore · Rs.12,000</div>
+          <div class="sug-item" onclick="useTpl('Plan a 6-day adventure trip from Chandigarh to Spiti Valley for a group of 6, budget Rs.1,20,000. Camping, trekking and bikes.')"><span class="sug-tag">ADVENTURE</span>6-day Spiti Valley group of 6 · Rs.1,20,000</div>
+          <div class="sug-item" onclick="useTpl('Plan a 4-day spiritual trip to Varanasi and Prayagraj from Patna for 2, budget Rs.20000. Ghats, temples and Ganga Aarti.')"><span class="sug-tag">SPIRITUAL</span>4-day Varanasi + Prayagraj · Patna · Rs.20,000</div>
+          <div class="sug-item" onclick="useTpl('Plan a 3-day weekend getaway from Hyderabad to Coorg for 2, budget Rs.22000. Coffee estates, waterfalls and cozy homestay.')"><span class="sug-tag">WEEKEND</span>3-day Coorg weekend · Hyderabad · Rs.22,000</div>
+        </div>
+      </div>
+
+      <!-- Travel mode -->
+      <div class="mode-section">
+        <label class="lbl">🚀 Mode of Travel</label>
+        <div class="mode-grid">
+          <div class="mode-card" id="mc-bike" onclick="selMode('bike')"><div class="ico">🏍️</div><div class="lbl2">Bike</div></div>
+          <div class="mode-card" id="mc-car"  onclick="selMode('car')"><div class="ico">🚗</div><div class="lbl2">Car</div></div>
+          <div class="mode-card on" id="mc-train" onclick="selMode('train')"><div class="ico">🚂</div><div class="lbl2">Train</div></div>
+          <div class="mode-card" id="mc-flight" onclick="selMode('flight')"><div class="ico">✈️</div><div class="lbl2">Flight</div></div>
+          <div class="mode-card" id="mc-bus"  onclick="selMode('bus')"><div class="ico">🚌</div><div class="lbl2">Bus</div></div>
+        </div>
+        <div class="sub-row" id="sub-row"></div>
+        <div class="cost-line" id="cost-line"><b>Train · Sleeper</b> · ~Rs.0.50/km — most economical</div>
+      </div>
+
+      <!-- Trip description -->
+      <label class="lbl" for="tq">Describe Your Trip</label>
+      <textarea class="inp" id="tq" placeholder="E.g. Plan a 5-day family trip from Patna to Manali for 4 people. Budget Rs.50,000. We love trekking, local food and scenic viewpoints. Prefer mid-range hotels." rows="4"></textarea>
+
+      <button class="btn-gen" id="gen-btn" onclick="planTrip()">✈&nbsp;&nbsp;Generate My Itinerary</button>
+      <div class="form-foot">🔒 Secure &nbsp;·&nbsp; 🌐 Real live data &nbsp;·&nbsp; 📄 Word doc &nbsp;·&nbsp; <kbd>Ctrl+Enter</kbd></div>
+    </div>
+
+    <!-- RIGHT: Calendar + Info -->
+    <div class="right-col">
+
+      <!-- Calendar -->
+      <div class="card">
+        <div class="cal-hdr">
+          <div class="cal-month" id="cal-title">July 2026</div>
+          <div class="cal-navs">
+            <button onclick="moveCal(-1)">‹</button>
+            <button onclick="moveCal(1)">›</button>
+          </div>
+        </div>
+        <div class="cal-grid" id="cal-grid"></div>
+        <div class="hol-name" id="hol-name"></div>
+        <div class="cal-leg">
+          <div class="leg"><div class="leg-dot" style="background:var(--g)"></div>Today</div>
+          <div class="leg"><div class="leg-dot" style="background:rgba(255,110,110,.8)"></div>Weekend</div>
+          <div class="leg"><div class="leg-dot" style="background:var(--y)"></div>Holiday</div>
+        </div>
+      </div>
+
+      <!-- Know Before You Go -->
+      <div class="card">
+        <div class="kbyg-title">🧭 Know Before You Go</div>
+        <div class="kbyg-item">
+          <div class="kbyg-ico">🛂</div>
+          <div class="kbyg-body"><strong>Permits Required</strong><p>Ladakh ILP, Arunachal PAP/ILP, Andaman RAP — apply online 2–4 weeks ahead.</p></div>
+        </div>
+        <div class="kbyg-item">
+          <div class="kbyg-ico">🏥</div>
+          <div class="kbyg-body"><strong>Emergency Numbers</strong><p>Police 100 · Ambulance 108 · Tourist 1363 · Women 1091</p></div>
+        </div>
+        <div class="kbyg-item">
+          <div class="kbyg-ico">🏔️</div>
+          <div class="kbyg-body"><strong>High Altitude</strong><p>Acclimatize 2 days in Leh. Carry Diamox. Avoid alcohol for 48 hrs. ORS sachets essential.</p></div>
+        </div>
+        <div class="kbyg-item">
+          <div class="kbyg-ico">💰</div>
+          <div class="kbyg-body"><strong>Money & Connectivity</strong><p>Carry cash for remote areas. BSNL works best in hills. Download offline maps before leaving.</p></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Feature strip -->
+  <div class="feat-strip">
+    <div class="feat">🌤️ Open-Meteo real weather</div>
+    <div class="feat">🏨 OpenStreetMap hotels</div>
+    <div class="feat">💱 Live ECB currency</div>
+    <div class="feat">📐 Haversine distances</div>
+    <div class="feat">🔌 MCP protocol</div>
+    <div class="feat">🗄️ SQLite memory</div>
+  </div>
+</div>
+
+<!-- ══════════════════ RESULTS ══════════════════ -->
+<div id="page-results">
+  <div class="res-hero">
+    <div class="res-dest" id="r-dest">—</div>
+    <div class="res-sub" id="r-sub">AI-Generated Itinerary</div>
+  </div>
+  <div class="stats" id="r-stats"></div>
+  <div class="sum" id="r-sum" style="display:none"></div>
+  <div class="igrid" id="r-cards"></div>
+  <div id="r-hotels" style="display:none;margin-bottom:1.75rem">
+    <div class="sec-title">🏨 Hotel Options</div>
+    <div class="hotels" id="r-hotels-list"></div>
+    <div style="font-size:.7rem;color:var(--dim);margin-top:.5rem">💡 Estimates only — book via Booking.com / MakeMyTrip / Agoda</div>
+  </div>
+  <div id="r-tl" style="display:none;margin-bottom:1.75rem">
+    <div class="sec-title">📅 Day-by-Day Plan</div>
+    <div class="tl" id="r-tl-list"></div>
+  </div>
+  <div id="r-tips" style="display:none;margin-bottom:1.75rem">
+    <div class="sec-title">💡 Tips & Packing</div>
+    <div class="tips" id="r-tips-list"></div>
+  </div>
+  <div class="dl-area" id="r-dl" style="display:none">
+    <a class="btn-dl" id="r-dl-link" href="#" target="_blank">⬇&nbsp; Download Full Itinerary (.docx)</a>
+    <br>
+    <button class="btn-back" onclick="goHome()">↩ Plan Another Trip</button>
+  </div>
+</div>
+</main>
+
+<!-- Loader -->
+<div id="loader">
+  <div class="ring"><div class="plane">✈️</div></div>
+  <div class="steps">
+    <div class="step" id="s0"><span class="step-dot"></span>Connecting to AI…</div>
+    <div class="step" id="s1"><span class="step-dot"></span>Fetching real weather…</div>
+    <div class="step" id="s2"><span class="step-dot"></span>Calculating distances…</div>
+    <div class="step" id="s3"><span class="step-dot"></span>Finding hotels via OSM…</div>
+    <div class="step" id="s4"><span class="step-dot"></span>Live currency rates…</div>
+    <div class="step" id="s5"><span class="step-dot"></span>Building your itinerary…</div>
+    <div class="step" id="s6"><span class="step-dot"></span>Generating Word doc…</div>
+  </div>
+</div>
+<div id="toast"></div>
+<div id="up" onclick="scrollTo({top:0,behavior:'smooth'})">↑</div>
+
+<script>
+/* ════ CONFIG ════ */
+const API='http://127.0.0.1:8000', KEY='dev-key-change-me-in-production';
+
+/* ════ CLOCK ════ */
+const MO=['January','February','March','April','May','June','July','August','September','October','November','December'];
+const DA=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+function tick(){
+  const n=new Date();
+  document.getElementById('ct').textContent=
+    [n.getHours(),n.getMinutes(),n.getSeconds()].map(v=>String(v).padStart(2,'0')).join(':');
+  document.getElementById('cd').textContent=
+    DA[n.getDay()]+', '+n.getDate()+' '+MO[n.getMonth()].slice(0,3)+' '+n.getFullYear();
+}
+tick(); setInterval(tick,1000);
+
+/* ════ BACKGROUND ════ */
+const BGS={
+  mountains:{img:'static/images/bg_mountains.png',rain:false,k:['manali','shimla','leh','ladakh','kedarnath','mussoorie','nainital','dharamsala','kullu','spiti','kasol','kufri','auli','rohtang','himachal','dalhousie','mcleod','kasauli']},
+  beach:    {img:'static/images/bg_beach.png',    rain:false,k:['goa','puri','pondicherry','puducherry','rameswaram','diu','lakshadweep','andaman','vizag','visakhapatnam','mahabalipuram','varkala','kovalam','alibaug','tarkarli']},
+  hills:    {img:'static/images/bg_hills.png',    rain:false,k:['ooty','coorg','kodagu','munnar','darjeeling','wayanad','valparai','chikmagalur','yercaud','kodaikanal','coonoor','nilgiris','araku']},
+  waterfall:{img:'static/images/bg_waterfall.png',rain:true, k:['meghalaya','cherrapunji','shillong','dawki','mawlynnong','kaziranga','assam','mawsynram']},
+  desert:   {img:'static/images/bg_desert.png',   rain:false,k:['rajasthan','jaipur','jodhpur','jaisalmer','udaipur','pushkar','bikaner','ajmer']},
+  kerala:   {img:'static/images/bg_kerala.png',   rain:false,k:['kerala','kochi','cochin','alleppey','alappuzha','trivandrum','thiruvananthapuram','backwater','kumarakom','thekkady','periyar']},
+};
+let curBg='',rainOn=false,rainRaf=null;
+
+function detectBg(t){
+  const l=t.toLowerCase();
+  for(const[n,c] of Object.entries(BGS)) if(c.k.some(k=>l.includes(k))) return n;
+  return '';
+}
+function setBg(name){
+  if(name===curBg) return; curBg=name;
+  const el=document.getElementById('bg'), cfg=BGS[name];
+  el.style.opacity='0';
+  setTimeout(()=>{ el.style.backgroundImage=cfg?`url('${cfg.img}')`:''  ; el.style.opacity=cfg?'0.55':'0'; },700);
+  if(cfg?.rain&&!rainOn) startRain();
+  if(!cfg?.rain&&rainOn) stopRain();
+}
+function startRain(){
+  rainOn=true; const cv=document.getElementById('rain');
+  cv.width=innerWidth; cv.height=innerHeight; cv.style.opacity='.45';
+  const ctx=cv.getContext('2d');
+  const dr=Array.from({length:180},()=>({x:Math.random()*cv.width,y:Math.random()*cv.height,s:9+Math.random()*9,l:14+Math.random()*22,o:.25+Math.random()*.4}));
+  (function loop(){if(!rainOn)return;ctx.clearRect(0,0,cv.width,cv.height);dr.forEach(d=>{ctx.beginPath();ctx.globalAlpha=d.o;ctx.strokeStyle='rgba(140,210,255,.7)';ctx.lineWidth=1;ctx.moveTo(d.x,d.y);ctx.lineTo(d.x-2,d.y+d.l);ctx.stroke();d.y+=d.s;if(d.y>cv.height){d.y=-d.l;d.x=Math.random()*cv.width;}});ctx.globalAlpha=1;rainRaf=requestAnimationFrame(loop);})();
+}
+function stopRain(){rainOn=false;document.getElementById('rain').style.opacity='0';if(rainRaf)cancelAnimationFrame(rainRaf);}
+window.addEventListener('resize',()=>{const c=document.getElementById('rain');c.width=innerWidth;c.height=innerHeight;});
+
+/* Particles */
+(function(){
+  const cv=document.getElementById('pts'),ctx=cv.getContext('2d');let W,H,P;
+  function rsz(){W=cv.width=innerWidth;H=cv.height=innerHeight;}
+  function mk(){return{x:Math.random()*W,y:Math.random()*H,r:.4+Math.random()*1.3,vx:(Math.random()-.5)*.22,vy:-.06-Math.random()*.22,a:Math.random(),c:Math.random()<.5?'0,255,136':'0,212,255'};}
+  rsz();P=Array.from({length:60},mk);window.addEventListener('resize',rsz);
+  (function loop(){ctx.clearRect(0,0,W,H);P.forEach(p=>{ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,Math.PI*2);ctx.fillStyle=`rgba(${p.c},${p.a*.3})`;ctx.fill();p.x+=p.vx;p.y+=p.vy;p.a+=.003;if(p.y<0||p.a>1)Object.assign(p,mk(),{y:H,a:0});});requestAnimationFrame(loop);})();
+})();
+
+/* ════ DESTINATION PILLS ════ */
+document.querySelectorAll('.p').forEach(p=>{
+  p.addEventListener('click',()=>{
+    document.querySelectorAll('.p').forEach(x=>x.classList.remove('on'));
+    p.classList.add('on');
+    document.getElementById('tq').value=p.dataset.q;
+    setBg(detectBg(p.dataset.d));
+  });
+});
+document.getElementById('tq').addEventListener('input',e=>{const b=detectBg(e.target.value);if(b)setBg(b);});
+document.getElementById('tq').addEventListener('keydown',e=>{if(e.key==='Enter'&&e.ctrlKey)planTrip();});
+
+/* ════ PROMPT TEMPLATES ════ */
+function toggleSug(){
+  const btn=document.getElementById('sug-btn'), dd=document.getElementById('sug-drop');
+  btn.classList.toggle('open'); dd.classList.toggle('open');
+}
+function useTpl(t){
+  document.getElementById('tq').value=t;
+  document.getElementById('sug-lbl').textContent=t.slice(0,55)+'…';
+  document.getElementById('sug-btn').classList.remove('open');
+  document.getElementById('sug-drop').classList.remove('open');
+  setBg(detectBg(t));
+}
+document.addEventListener('click',e=>{ if(!e.target.closest('#sug-wrap')){ document.getElementById('sug-btn').classList.remove('open'); document.getElementById('sug-drop').classList.remove('open'); }});
+
+/* ════ TRAVEL MODE ════ */
+const MODES={
+  bike:  [{id:'110cc',l:'110cc (Splendor)',h:'~50 kmpl · Rs.2/km'},{id:'200cc',l:'200cc (Dominar)',h:'~35 kmpl · Rs.2.9/km'},{id:'300cc',l:'300cc (RE/RC)',h:'~28 kmpl · Rs.3.6/km'},{id:'650cc',l:'650cc (Interceptor)',h:'~22 kmpl · Rs.4.6/km'},{id:'1200cc',l:'1200cc (Adventure)',h:'~15 kmpl · Rs.6.7/km'}],
+  car:   [{id:'hatch',l:'Hatchback (Alto)',h:'~20 kmpl · Rs.5/km'},{id:'sedan',l:'Sedan (City/Dzire)',h:'~15 kmpl · Rs.6.7/km'},{id:'suv',l:'SUV (Creta/Scorpio)',h:'~12 kmpl · Rs.8.3/km'},{id:'lux',l:'Luxury (Fortuner)',h:'~8 kmpl · Rs.12.5/km'}],
+  train: [{id:'sl',l:'Sleeper',h:'~Rs.0.50/km'},{id:'3ac',l:'3AC',h:'~Rs.1.2/km'},{id:'2ac',l:'2AC',h:'~Rs.2/km'},{id:'1ac',l:'1AC',h:'~Rs.3.5/km'},{id:'vb',l:'Vande Bharat',h:'~Rs.2.8/km'}],
+  flight:[{id:'eco',l:'Economy',h:'AI-calculated'},{id:'biz',l:'Business',h:'~2.5× economy'}],
+  bus:   [{id:'state',l:'State Bus',h:'~Rs.0.8/km'},{id:'slp',l:'Sleeper Bus',h:'~Rs.1.5/km'},{id:'volvo',l:'Volvo AC',h:'~Rs.2.5/km'}],
+};
+let tMode='train', tSub='sl', tHint='Train Sleeper · ~Rs.0.50/km';
+
+function selMode(m){
+  tMode=m;
+  document.querySelectorAll('.mode-card').forEach(c=>c.classList.remove('on'));
+  document.getElementById('mc-'+m).classList.add('on');
+  renderSubs(m);
+}
+function renderSubs(m){
+  const row=document.getElementById('sub-row');
+  row.innerHTML=MODES[m].map((s,i)=>`<div class="sub-chip${i===0?' on':''}" id="sc-${s.id}" onclick="selSub('${s.id}','${s.l} · ${s.h}',this)">${s.l}</div>`).join('');
+  // auto-select first
+  tSub=MODES[m][0].id;
+  tHint=MODES[m][0].l+' · '+MODES[m][0].h;
+  document.getElementById('cost-line').innerHTML=`<b>${tHint}</b>`;
+}
+function selSub(id,hint,el){
+  tSub=id; tHint=hint;
+  document.querySelectorAll('#sub-row .sub-chip').forEach(c=>c.classList.remove('on'));
+  el.classList.add('on');
+  document.getElementById('cost-line').innerHTML=`<b>${hint}</b>`;
+}
+// Init
+renderSubs('train');
+
+/* ════ CALENDAR ════ */
+const HOL={
+  '2026-01-01':"New Year's Day",'2026-01-14':'Makar Sankranti / Pongal',
+  '2026-01-26':'🇮🇳 Republic Day','2026-02-17':'Maha Shivratri',
+  '2026-03-03':'Holi','2026-03-22':'Gudi Padwa / Ugadi',
+  '2026-03-29':'Ram Navami','2026-04-03':'Good Friday',
+  '2026-04-14':'Baisakhi / Ambedkar Jayanti','2026-05-01':'Labour Day',
+  '2026-05-31':'Buddha Purnima','2026-06-27':'Eid ul-Adha',
+  '2026-08-15':'🇮🇳 Independence Day','2026-08-19':'Raksha Bandhan',
+  '2026-08-26':'Janmashtami','2026-09-17':'Ganesh Chaturthi',
+  '2026-10-02':'🇮🇳 Gandhi Jayanti','2026-10-20':'Dussehra',
+  '2026-11-05':'Diwali','2026-11-08':'Bhai Dooj',
+  '2026-11-24':'Guru Nanak Jayanti','2026-12-25':'Christmas',
+};
+const NOW=new Date(); let cY=NOW.getFullYear(), cM=NOW.getMonth();
+function p2(n){return String(n).padStart(2,'0');}
+function renderCal(){
+  document.getElementById('cal-title').textContent=MO[cM]+' '+cY;
+  const g=document.getElementById('cal-grid');
+  let h=['Su','Mo','Tu','We','Th','Fr','Sa'].map(d=>`<div class="cal-dn">${d}</div>`).join('');
+  const fd=new Date(cY,cM,1).getDay(), dim=new Date(cY,cM+1,0).getDate(), prev=new Date(cY,cM,0).getDate();
+  for(let i=fd-1;i>=0;i--) h+=`<div class="cal-d other">${prev-i}</div>`;
+  for(let d=1;d<=dim;d++){
+    const iso=`${cY}-${p2(cM+1)}-${p2(d)}`;
+    const dw=new Date(cY,cM,d).getDay();
+    const isT=(cY===NOW.getFullYear()&&cM===NOW.getMonth()&&d===NOW.getDate());
+    const isH=!!HOL[iso], isW=(dw===0||dw===6);
+    let cls='cal-d';
+    if(isT) cls+=' today';
+    else if(isH) cls+=' hol';
+    else if(isW) cls+=' wkd';
+    h+=`<div class="${cls}" onclick="showHol('${iso}')" title="${HOL[iso]||''}">${d}</div>`;
+  }
+  const tot=fd+dim, rem=tot%7?7-tot%7:0;
+  for(let i=1;i<=rem;i++) h+=`<div class="cal-d other">${i}</div>`;
+  g.innerHTML=h;
+}
+function moveCal(d){ cM+=d; if(cM>11){cM=0;cY++;} if(cM<0){cM=11;cY--;} renderCal(); document.getElementById('hol-name').style.display='none'; }
+function showHol(iso){ const el=document.getElementById('hol-name'); if(HOL[iso]){el.textContent='🗓 '+HOL[iso];el.style.display='block';}else el.style.display='none'; }
+renderCal();
+
+/* ════ LOADER ════ */
+let lt=null;
+function startLoader(){
+  let i=0; const ss=document.querySelectorAll('.step');
+  ss.forEach(s=>s.className='step'); ss[0].classList.add('on');
+  lt=setInterval(()=>{if(i<ss.length-1){ss[i].classList.replace('on','done');i++;ss[i].classList.add('on');}},3000);
+}
+function stopLoader(){ if(lt){clearInterval(lt);lt=null;} document.querySelectorAll('.step').forEach(s=>{s.classList.remove('on');s.classList.add('done');}); }
+
+/* ════ TOAST ════ */
+function toast(m){ const t=document.getElementById('toast'); t.textContent=m; t.classList.add('on'); setTimeout(()=>t.classList.remove('on'),4500); }
+
+/* ════ PLAN TRIP ════ */
+async function planTrip(){
+  const uid   = document.getElementById('uid').value.trim() || 'guest_'+Date.now();
+  const origin= document.getElementById('origin').value.trim();
+  const dest  = document.getElementById('dest-inp').value.trim();
+  const bud   = document.getElementById('bud').value.trim();
+  let q       = document.getElementById('tq').value.trim();
+
+  // Auto-build query from From/To fields if textarea is empty or short
+  if((!q||q.length<15) && origin && dest){
+    q = `Plan a trip from ${origin} to ${dest}${bud?' with budget '+bud:''}. [auto-generated]`;
+    document.getElementById('tq').value = q;
+  }
+  if(!q||q.length<10){ toast('⚠️ Please describe your trip or fill in From / To fields!'); return; }
+
+  // Prepend From→To if fields are filled and not already in query
+  let enriched = q;
+  if(origin && !q.toLowerCase().includes(origin.toLowerCase()))
+    enriched = `From ${origin} to ${dest||'destination'}: ` + enriched;
+  if(bud && !q.toLowerCase().includes(bud.replace(/[^0-9]/g,'')))
+    enriched += ` Budget: ${bud}.`;
+  const fullQ = enriched + ` [Travel mode: ${tMode} / ${tSub} — ${tHint}]`;
+
+  setBg(detectBg(dest||q));
+  document.getElementById('loader').classList.add('on');
+  document.getElementById('gen-btn').disabled = true;
+  startLoader();
+
+  try{
+    const r = await fetch(`${API}/agent`,{
+      method:'POST',
+      headers:{'Content-Type':'application/json','X-API-Key':KEY},
+      body:JSON.stringify({user_id:uid, query:fullQ})
+    });
+    if(!r.ok){ const e=await r.json().catch(()=>({detail:r.statusText})); throw new Error(e.detail||'Server error '+r.status); }
+    const data = await r.json();
+    stopLoader();
+    await new Promise(x=>setTimeout(x,400));
+    document.getElementById('loader').classList.remove('on');
+    showResults(data);
+    setBg(detectBg(data.itinerary?.destination||dest||''));
+  }catch(e){
+    stopLoader();
+    document.getElementById('loader').classList.remove('on');
+    toast('❌ '+(e.message||'Error — is the server running on :8000?'));
+  }finally{
+    document.getElementById('gen-btn').disabled = false;
+  }
+}
+
+/* ════ RENDER RESULTS ════ */
+function fmt(n){
+  if(n===null||n===undefined||n===''||n==='—') return '—';
+  const v=typeof n==='string'?parseFloat(n.replace(/,/g,'')):n;
+  return isNaN(v)?String(n):'Rs.'+v.toLocaleString('en-IN');
+}
+function mkKv(k,v,c=''){return `<div class="kv"><span class="kk">${k}</span><span class="kv2 ${c}">${v||'—'}</span></div>`;}
+
+function showResults(data){
+  const iti=data.itinerary||{};
+  document.getElementById('page-home').style.display='none';
+  document.getElementById('page-results').style.display='block';
+
+  document.getElementById('r-dest').textContent=iti.destination||'Your Destination';
+  const originTxt = iti.origin || document.getElementById('origin').value.trim() || '';
+  document.getElementById('r-sub').textContent=`${originTxt?originTxt+' → ':''}${iti.destination||''} · ${iti.duration_days||'—'} days · ${iti.group_size||'—'} pax · ${iti.travel_mode||tMode}`;
+
+  // Stats
+  const fit=(iti.budget_fit||'').toLowerCase(), bc=fit.includes('within')?'ok':'ov';
+  document.getElementById('r-stats').innerHTML=[
+    {v:iti.duration_days||'—',l:'Days'},
+    {v:iti.group_size||'—',l:'Travellers'},
+    {v:fmt(iti.budget_total_inr),l:'Your Budget'},
+    {v:fmt(iti.travel_cost_inr||iti.flight_info?.travel_cost_inr),l:'Travel Cost'},
+    {v:fmt(iti.hotel_cost_inr),l:'Hotel Cost'},
+    {v:fmt(iti.total_estimated_cost_inr),l:'Total Est. Cost'},
+    {v:`<span class="bb ${bc}">${iti.budget_fit||'—'}</span>`,l:'Status'},
+  ].map(s=>`<div class="sc"><div class="sv">${s.v}</div><div class="sl">${s.l}</div></div>`).join('');
+
+  // Summary
+  if(iti.summary){ const el=document.getElementById('r-sum'); el.style.display='block'; el.innerHTML=`<strong style="font-family:Outfit,sans-serif;font-size:1rem;color:var(--txt);display:block;margin-bottom:.5rem">📝 Trip Summary</strong>${iti.summary}`; }
+
+  // Info Cards
+  const cg=document.getElementById('r-cards'); cg.innerHTML='';
+  const w=iti.weather_info||{};
+  if(w.condition||w.temp_c!==undefined){
+    const fc=(w.seven_day_forecast||[]).slice(0,2).map(d=>`${d.date?.slice(5)||''} ${d.condition||''} ${d.max_c??''}°`).join(' · ');
+    cg.innerHTML+=`<div class="ic wc"><div class="cico">🌤️</div><div class="ctitle">Weather — ${w.location||iti.destination}</div><div class="kvs">${mkKv('Condition',w.condition,'c')}${mkKv('Temperature',w.temp_c!==undefined?w.temp_c+'°C':'—')}${mkKv('Feels Like',w.feels_like_c!==undefined?w.feels_like_c+'°C':'—')}${mkKv('Humidity',w.humidity_pct!==undefined?w.humidity_pct+'%':'—')}${mkKv('Season',w.current_season,'g')}${mkKv('Source',w.data_source||'Open-Meteo')}</div>${w.travel_advisory?`<div class="adv">${w.travel_advisory}</div>`:''}${fc?`<div class="adv" style="border-left-color:var(--g);margin-top:.5rem;font-size:.72rem">📅 ${fc}</div>`:''}</div>`;
+  }
+  const fl=iti.flight_info||{};
+  if(fl.origin||fl.distance_km){
+    const travelIco = tMode==='flight'?'✈️':tMode==='train'?'🚂':tMode==='bike'?'🏍️':tMode==='car'?'🚗':'🚌';
+    cg.innerHTML+=`<div class="ic fc"><div class="cico">${travelIco}</div><div class="ctitle">Travel Info — ${iti.travel_mode||tMode}</div><div class="kvs">${mkKv('Route',(fl.origin||'—')+' → '+(fl.destination||'—'),'m')}${mkKv('Distance',fl.distance_km?fl.distance_km+' km':'—')}${mkKv('Travel Mode',iti.travel_mode||tMode,'c')}${mkKv('Total Travel Cost',fmt(fl.travel_cost_inr||iti.travel_cost_inr),'o')}${mkKv('Duration',fl.duration_hrs?fl.duration_hrs+' hrs':'—')}</div>${fl.note?`<div class="adv" style="border-left-color:var(--m)">${fl.note}</div>`:''}</div>`;
+  }
+  const cx=iti.currency_info||{};
+  if(cx.rates&&Object.keys(cx.rates).length){
+    cg.innerHTML+=`<div class="ic cc"><div class="cico">💱</div><div class="ctitle">Live Rates</div><div class="kvs">${Object.entries(cx.rates).map(([c,v])=>mkKv(cx.base+'→'+c,v?v.toLocaleString('en-IN',{maximumFractionDigits:2}):'—')).join('')}${mkKv('Source',cx.data_source||'ECB','y')}${mkKv('Date',cx.date||'Today')}</div></div>`;
+  }
+
+  // Hotels — 3 tiers
+  const hi=iti.hotel_info||{};
+  const tiers = hi.tiers || {};
+  const hasAnyTier = tiers.budget||tiers.midrange||tiers.premium;
+  const legacyOpts = hi.options||[];
+  if(hasAnyTier || legacyOpts.length){
+    document.getElementById('r-hotels').style.display='block';
+    let hotHtml='';
+    if(hasAnyTier){
+      const TIER_COLORS={budget:'var(--g)',midrange:'var(--c)',premium:'var(--o)'};
+      const TIER_ICO={budget:'💚',midrange:'💙',premium:'🟠'};
+      for(const [tk,td] of Object.entries(tiers)){
+        if(!td||!td.options) continue;
+        hotHtml+=`<div style="margin-bottom:.6rem"><div style="font-size:.72rem;font-weight:700;color:${TIER_COLORS[tk]};margin-bottom:.4rem;letter-spacing:.04em">${TIER_ICO[tk]} ${td.label||tk.toUpperCase()} — ${td.price_range||''}</div>`;
+        hotHtml+=td.options.map(h=>`<div class="hotel"><div><div class="hn">${h.name}</div><div class="hm">${h.type||'Hotel'} · ${h.stars||''} · ${h.source||''}</div></div><div class="hp" style="color:${TIER_COLORS[tk]}">${fmt(h.estimated_price_per_night_inr)}<span style="font-size:.68rem;font-weight:400;color:var(--dim)">/night</span></div></div>`).join('');
+        hotHtml+='</div>';
+      }
+    } else {
+      hotHtml=legacyOpts.map(h=>`<div class="hotel"><div><div class="hn">${h.name}</div><div class="hm">${h.type||'Hotel'} · ${h.stars||''} · ${h.source||''}</div></div><div class="hp">${fmt(h.estimated_price_per_night_inr)}<span style="font-size:.68rem;font-weight:400;color:var(--dim)">/night</span></div></div>`).join('');
+    }
+    document.getElementById('r-hotels-list').innerHTML=hotHtml;
+  }
+
+  // Timeline with price breakdown
+  const days=iti.day_by_day||[];
+  if(days.length){
+    document.getElementById('r-tl').style.display='block';
+    document.getElementById('r-tl-list').innerHTML=days.map((d,i)=>{
+      const m=d.meals||{};
+      // Meals as visual rows
+      const mealIco={breakfast:'🌅',lunch:'☀️',dinner:'🌙',snack:'🍿'};
+      const mealHtml=Object.entries(m).filter(([,v])=>v&&v!=='—').map(([k,v])=>
+        `<div style="display:flex;gap:.45rem;align-items:flex-start;font-size:.78rem;color:var(--sub);padding:.2rem 0">
+          <span style="flex-shrink:0">${mealIco[k]||'🍽️'}</span>
+          <span><span style="color:var(--txt);font-weight:600;text-transform:capitalize">${k}:</span> ${v}</span>
+        </div>`
+      ).join('');
+      // Cost breakdown
+      const bk=d.day_cost_breakdown||{};
+      const bkHtml=Object.keys(bk).length?`
+        <div style="margin-top:.7rem;padding:.6rem .75rem;background:rgba(0,255,136,.04);border-radius:9px;border:1px solid rgba(0,255,136,.12)">
+          <div style="font-size:.68rem;font-weight:700;color:var(--g);letter-spacing:.06em;margin-bottom:.4rem">📊 COST BREAKDOWN</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:.25rem .5rem">
+            ${bk.entry_tickets_inr!==undefined?`<span style="font-size:.72rem;color:var(--sub)">Entry tickets</span><span style="font-size:.72rem;color:var(--txt);text-align:right">${fmt(bk.entry_tickets_inr)}</span>`:''}
+            ${bk.local_transport_inr!==undefined?`<span style="font-size:.72rem;color:var(--sub)">Local transport</span><span style="font-size:.72rem;color:var(--txt);text-align:right">${fmt(bk.local_transport_inr)}</span>`:''}
+            ${bk.food_inr!==undefined?`<span style="font-size:.72rem;color:var(--sub)">Food & drinks</span><span style="font-size:.72rem;color:var(--txt);text-align:right">${fmt(bk.food_inr)}</span>`:''}
+            ${bk.activities_inr!==undefined?`<span style="font-size:.72rem;color:var(--sub)">Activities</span><span style="font-size:.72rem;color:var(--txt);text-align:right">${fmt(bk.activities_inr)}</span>`:''}
+            ${bk.misc_inr!==undefined?`<span style="font-size:.72rem;color:var(--sub)">Misc</span><span style="font-size:.72rem;color:var(--txt);text-align:right">${fmt(bk.misc_inr)}</span>`:''}
+          </div>
+          <div style="border-top:1px solid rgba(0,255,136,.15);margin-top:.35rem;padding-top:.35rem;display:flex;justify-content:space-between">
+            <span style="font-size:.75rem;font-weight:700;color:var(--g)">Day Total</span>
+            <span style="font-size:.75rem;font-weight:700;color:var(--g)">${fmt(d.estimated_cost_inr)}</span>
+          </div>
+        </div>`:'';
+      return `<div class="dc${i===0?' open':''}" id="dc${i}">
+        <div class="dh" onclick="toggleDay(${i})">
+          <div class="dn">D${d.day}</div>
+          <div class="dt">${d.title||'Day '+d.day}</div>
+          <div class="dco">${fmt(d.estimated_cost_inr)}</div>
+          <div class="dchev">▼</div>
+        </div>
+        <div class="db">
+          <ul class="al">${(d.activities||[]).map(a=>`<li>${a}</li>`).join('')}</ul>
+          ${mealHtml?`<div style="margin-top:.65rem;padding-top:.65rem;border-top:1px solid rgba(255,255,255,.05)">${mealHtml}</div>`:''}
+          ${bkHtml}
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  // Tips
+  const tips=[...(iti.tips||[]),(iti.packing_list||[])].flat().filter(Boolean);
+  if(tips.length){
+    const ico=['💡','🎒','🗺️','📸','🍛','🚌','💊','🌂','💳','📱','🧴','🔌'];
+    document.getElementById('r-tips').style.display='block';
+    document.getElementById('r-tips-list').innerHTML=tips.map((t,i)=>`<div class="tip"><span>${ico[i%ico.length]}</span>${t}</div>`).join('');
+  }
+
+  // Download
+  if(data.doc_url){
+    document.getElementById('r-dl').style.display='block';
+    document.getElementById('r-dl-link').href=data.doc_url;
+  }
+  setTimeout(()=>{ window.scrollTo({top:0,behavior:'smooth'}); document.getElementById('up').classList.add('on'); },200);
+}
+
+function toggleDay(i){ document.getElementById('dc'+i).classList.toggle('open'); }
+
+function goHome(){
+  document.getElementById('page-results').style.display='none';
+  document.getElementById('page-home').style.display='flex';
+  document.getElementById('up').classList.remove('on');
+  document.querySelectorAll('.p').forEach(p=>p.classList.remove('on'));
+  setBg(''); window.scrollTo({top:0,behavior:'smooth'});
+  ['r-hotels','r-tl','r-tips','r-dl','r-sum'].forEach(id=>{const e=document.getElementById(id);if(e)e.style.display='none';});
+}
+
+window.addEventListener('scroll',()=>document.getElementById('up').classList.toggle('on',scrollY>300));
+</script>
+</body>
+</html>
